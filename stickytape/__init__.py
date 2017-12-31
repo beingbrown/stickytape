@@ -58,7 +58,7 @@ class ModuleWriterGenerator(object):
     def _generate_for_module(self, python_module):
         import_lines = _find_imports_in_file(python_module.absolute_path)
         for import_line in import_lines:
-            if not _is_stlib_import(import_line):
+            if import_line != None and not _is_stlib_import(import_line):
                 self._generate_for_import(python_module, import_line)
     
     def _generate_for_import(self, python_module, import_line):
@@ -109,23 +109,23 @@ class ModuleWriterGenerator(object):
                 return ImportTarget(full_module_path, module_path)
         return None
 
-            
+def _detect_import(node):
+    if isinstance(node, ast.Import):
+        for name in node.names:
+            return ImportLine(name.name, [])
+    if isinstance(node, ast.ImportFrom):
+        if node.module is None:
+            module = "."
+        else:
+            module = node.module
+        return ImportLine(module, [name.name for name in node.names])
+
 def _find_imports_in_file(file_path):
     source = _read_file(file_path)
     parse_tree = ast.parse(source, file_path)
     
     for node in ast.walk(parse_tree):
-        if isinstance(node, ast.Import):
-            for name in node.names:
-                yield ImportLine(name.name, [])
-                
-        if isinstance(node, ast.ImportFrom):
-            if node.module is None:
-                module = "."
-            else:
-                module = node.module
-            yield ImportLine(module, [name.name for name in node.names])
-
+        yield _detect_import(node)
 
 def _resolve_package_to_import_path(package):
     import_path = package.replace(".", "/")
